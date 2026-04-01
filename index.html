@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Nightly To-Dos</title>
+    <meta
+      name="description"
+      content="Plan tomorrow's tasks each night and stay on top of unfinished work."
+    />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="hero">
+        <p class="eyebrow">Nightly planner</p>
+        <h1>Capture tomorrow before the day gets away from you.</h1>
+        <p class="hero-copy">
+          Add your tasks each night, check them off during the day, and get nudges
+          for anything still open.
+        </p>
+        <div class="hero-actions">
+          <button id="open-nightly-modal" class="primary-button">Plan tonight</button>
+          <button id="enable-notifications" class="secondary-button">
+            Enable reminders
+          </button>
+        </div>
+      </section>
+
+      <section class="panel panel-status">
+        <div>
+          <p class="panel-label" id="active-date-caption">Selected day</p>
+          <h2 id="today-label"></h2>
+        </div>
+        <div class="status-grid">
+          <div class="status-card">
+            <span class="status-value" id="completed-count">0</span>
+            <span class="status-text">completed</span>
+          </div>
+          <div class="status-card">
+            <span class="status-value" id="remaining-count">0</span>
+            <span class="status-text">remaining</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <p class="panel-label">Calendar</p>
+            <h2 id="calendar-month-label"></h2>
+          </div>
+          <div class="panel-actions">
+            <button id="previous-month" class="secondary-button" type="button">Back</button>
+            <button id="jump-today" class="text-button" type="button">Jump to today</button>
+            <button id="next-month" class="secondary-button" type="button">Next</button>
+          </div>
+        </div>
+        <div class="calendar-weekdays">
+          <span>Sun</span>
+          <span>Mon</span>
+          <span>Tue</span>
+          <span>Wed</span>
+          <span>Thu</span>
+          <span>Fri</span>
+          <span>Sat</span>
+        </div>
+        <div id="calendar-grid" class="calendar-grid"></div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <p class="panel-label">Task list</p>
+            <h2>Your plan</h2>
+          </div>
+          <div class="panel-actions">
+            <button id="add-task-inline" class="text-button">Add task</button>
+          </div>
+        </div>
+        <form id="quick-add-form" class="quick-add-form">
+          <label for="quick-task-input" class="sr-only">Task</label>
+          <input
+            id="quick-task-input"
+            name="task"
+            type="text"
+            maxlength="120"
+            placeholder="Add a task for the selected date"
+          />
+          <button class="primary-button" type="submit">Save</button>
+        </form>
+        <ul id="task-list" class="task-list"></ul>
+        <p id="empty-state" class="empty-state">
+          Nothing planned yet. Use "Plan tonight" to set up tomorrow.
+        </p>
+      </section>
+    </main>
+
+    <dialog id="nightly-dialog" class="nightly-dialog">
+      <form method="dialog" class="nightly-card" id="nightly-form">
+        <div class="nightly-head">
+          <p class="panel-label">9:00 PM ritual</p>
+          <h2>What do you need to get done?</h2>
+          <p id="nightly-subtitle" class="nightly-copy"></p>
+        </div>
+
+        <label class="date-field">
+          <span class="date-field-label">Save these tasks for</span>
+          <input id="nightly-date-input" type="date" />
+        </label>
+
+        <div id="nightly-inputs" class="nightly-inputs"></div>
+
+        <div class="nightly-actions">
+          <button type="button" id="add-nightly-task" class="text-button">Add another</button>
+          <div class="nightly-submit">
+            <button type="button" id="close-nightly-dialog" class="secondary-button">
+              Later
+            </button>
+            <button type="submit" class="primary-button">Save plan</button>
+          </div>
+        </div>
+      </form>
+    </dialog>
+
+    <template id="task-item-template">
+      <li class="task-item">
+        <label class="task-checkbox">
+          <input type="checkbox" />
+          <span class="task-checkmark"></span>
+        </label>
+        <div class="task-body">
+          <p class="task-title"></p>
+          <p class="task-meta"></p>
+        </div>
+        <button class="delete-button" type="button" aria-label="Delete task">
+          Remove
+        </button>
+      </li>
+    </template>
+
+    <script src="app.js"></script>
+  </body>
+</html>

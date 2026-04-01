@@ -1,0 +1,421 @@
+:root {
+  color-scheme: light;
+  --bg: #f7f2e8;
+  --panel: rgba(255, 252, 246, 0.82);
+  --panel-strong: #fffaf0;
+  --ink: #1c1917;
+  --muted: #6b5d53;
+  --accent: #b6461d;
+  --accent-deep: #8c3414;
+  --line: rgba(28, 25, 23, 0.12);
+  --shadow: 0 24px 60px rgba(92, 63, 35, 0.14);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at top left, rgba(237, 137, 54, 0.24), transparent 30%),
+    radial-gradient(circle at bottom right, rgba(180, 70, 29, 0.16), transparent 24%),
+    linear-gradient(180deg, #fbf6ee 0%, var(--bg) 100%);
+}
+
+button,
+input {
+  font: inherit;
+}
+
+.app-shell {
+  width: min(960px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 40px 0 64px;
+}
+
+.hero,
+.panel {
+  background: var(--panel);
+  backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 28px;
+  box-shadow: var(--shadow);
+}
+
+.hero {
+  padding: 32px;
+  margin-bottom: 24px;
+}
+
+.eyebrow,
+.panel-label {
+  margin: 0 0 8px;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.77rem;
+  font-weight: 700;
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: clamp(2.3rem, 6vw, 4.4rem);
+  line-height: 0.94;
+  max-width: 12ch;
+}
+
+.hero-copy {
+  color: var(--muted);
+  max-width: 56ch;
+  margin-top: 18px;
+  font-size: 1.05rem;
+  line-height: 1.6;
+}
+
+.hero-actions,
+.nightly-actions,
+.panel-head,
+.panel-actions,
+.status-grid,
+.task-item,
+.nightly-submit {
+  display: flex;
+  gap: 12px;
+}
+
+.hero-actions {
+  margin-top: 28px;
+  flex-wrap: wrap;
+}
+
+.primary-button,
+.secondary-button,
+.text-button,
+.delete-button {
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  transition: transform 140ms ease, background 140ms ease, opacity 140ms ease;
+}
+
+.primary-button,
+.secondary-button {
+  padding: 12px 18px;
+  font-weight: 700;
+}
+
+.primary-button {
+  color: #fffaf6;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-deep) 100%);
+}
+
+.secondary-button {
+  background: rgba(255, 255, 255, 0.7);
+  color: var(--ink);
+  border: 1px solid rgba(28, 25, 23, 0.08);
+}
+
+.text-button,
+.delete-button {
+  background: transparent;
+  color: var(--accent-deep);
+  padding: 0;
+  font-weight: 700;
+}
+
+button:hover {
+  transform: translateY(-1px);
+}
+
+.panel {
+  padding: 24px;
+  margin-bottom: 20px;
+}
+
+.panel-status {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.status-grid {
+  flex-wrap: wrap;
+}
+
+.status-card {
+  min-width: 132px;
+  padding: 16px 18px;
+  background: var(--panel-strong);
+  border-radius: 20px;
+  border: 1px solid var(--line);
+}
+
+.status-value {
+  display: block;
+  font-size: 2rem;
+  font-weight: 800;
+}
+
+.status-text,
+.task-meta,
+.nightly-copy,
+.empty-state {
+  color: var(--muted);
+}
+
+.panel-head {
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.panel-actions {
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.quick-add-form {
+  display: none;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.quick-add-form.visible {
+  display: grid;
+}
+
+input[type="text"] {
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--ink);
+}
+
+input[type="date"] {
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--ink);
+}
+
+.task-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.task-item {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.76);
+  border: 1px solid var(--line);
+  padding: 14px 16px;
+  border-radius: 20px;
+}
+
+.task-body {
+  flex: 1;
+}
+
+.task-title {
+  font-weight: 700;
+}
+
+.task-item.is-complete .task-title {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.task-checkbox {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.task-checkbox input {
+  position: absolute;
+  opacity: 0;
+  inset: 0;
+  cursor: pointer;
+}
+
+.task-checkmark {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid rgba(182, 70, 29, 0.45);
+  background: #fff;
+}
+
+.task-checkbox input:checked + .task-checkmark {
+  background: radial-gradient(circle at center, var(--accent) 45%, #fff7f2 46%);
+}
+
+.empty-state {
+  padding: 18px 0 2px;
+}
+
+.calendar-weekdays,
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.calendar-weekdays {
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
+.calendar-day {
+  min-height: 94px;
+  padding: 12px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.72);
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.calendar-day.is-selected {
+  border-color: rgba(182, 70, 29, 0.55);
+  background: #fff7f0;
+  box-shadow: 0 12px 24px rgba(92, 63, 35, 0.12);
+}
+
+.calendar-day.is-today .calendar-day-number {
+  color: var(--accent-deep);
+}
+
+.calendar-day.is-outside-month {
+  opacity: 0.46;
+}
+
+.calendar-day-number {
+  font-size: 1.05rem;
+  font-weight: 800;
+}
+
+.calendar-day-meta {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.nightly-dialog {
+  width: min(680px, calc(100% - 24px));
+  border: none;
+  background: transparent;
+  padding: 0;
+}
+
+.nightly-dialog::backdrop {
+  background: rgba(28, 25, 23, 0.28);
+  backdrop-filter: blur(3px);
+}
+
+.nightly-card {
+  background: #fffaf3;
+  border-radius: 28px;
+  padding: 28px;
+  box-shadow: var(--shadow);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+.nightly-copy {
+  margin-top: 10px;
+  line-height: 1.5;
+}
+
+.date-field {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.date-field-label {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.nightly-inputs {
+  display: grid;
+  gap: 12px;
+  margin: 22px 0 24px;
+}
+
+.nightly-actions {
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (max-width: 720px) {
+  .app-shell {
+    width: min(100% - 20px, 960px);
+    padding-top: 20px;
+  }
+
+  .hero,
+  .panel,
+  .nightly-card {
+    padding: 20px;
+    border-radius: 22px;
+  }
+
+  .panel-status,
+  .task-item,
+  .nightly-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .quick-add-form {
+    grid-template-columns: 1fr;
+  }
+
+  .calendar-weekdays,
+  .calendar-grid {
+    gap: 8px;
+  }
+
+  .calendar-day {
+    min-height: 82px;
+    padding: 10px;
+  }
+}
