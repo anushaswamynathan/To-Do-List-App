@@ -2,6 +2,7 @@
 
 import json
 import os
+import tempfile
 import uuid
 from datetime import date, datetime, timedelta
 from http import HTTPStatus
@@ -11,8 +12,6 @@ from typing import Optional, Tuple
 from urllib.parse import unquote
 
 BASE_DIR = Path(__file__).resolve().parent
-DATA_DIR = Path(os.getenv("NIGHTLY_TODOS_DATA_DIR", str(BASE_DIR / "data"))).expanduser()
-STATE_PATH = DATA_DIR / "state.json"
 HOST = os.getenv("NIGHTLY_TODOS_HOST", "127.0.0.1")
 PORT = int(os.getenv("PORT", os.getenv("NIGHTLY_TODOS_PORT", "4173")))
 
@@ -36,6 +35,31 @@ def create_empty_state() -> dict:
         "lastReminderAt": None,
         "notificationsEnabled": False,
     }
+
+
+def resolve_data_dir() -> Path:
+    candidates = []
+    configured = os.getenv("NIGHTLY_TODOS_DATA_DIR")
+    if configured:
+        candidates.append(Path(configured).expanduser())
+    candidates.append(BASE_DIR / "data")
+    candidates.append(Path(tempfile.gettempdir()) / "nightly-todos-data")
+
+    for candidate in candidates:
+        try:
+            candidate.mkdir(parents=True, exist_ok=True)
+            probe = candidate / ".write-test"
+            probe.write_text("ok")
+            probe.unlink()
+            return candidate
+        except OSError:
+            continue
+
+    raise RuntimeError("No writable data directory available")
+
+
+DATA_DIR = resolve_data_dir()
+STATE_PATH = DATA_DIR / "state.json"
 
 
 def load_state() -> dict:
