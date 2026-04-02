@@ -1,39 +1,36 @@
-const NIGHTLY_PROMPT_HOUR = 21;
-
 const state = {
-  tasksByDate: {},
-  lastNightlyPromptAt: null,
-  lastReminderAt: null,
-  notificationsEnabled: false,
+  criteria: {},
+  digestsByDate: {},
   selectedDateKey: getDateKey(new Date()),
   visibleMonth: startOfMonth(new Date()),
+  activeFilter: "all",
 };
 
 const elements = {
   activeDateCaption: document.querySelector("#active-date-caption"),
   todayLabel: document.querySelector("#today-label"),
-  completedCount: document.querySelector("#completed-count"),
-  remainingCount: document.querySelector("#remaining-count"),
-  taskList: document.querySelector("#task-list"),
+  digestSummary: document.querySelector("#digest-summary"),
+  criteriaList: document.querySelector("#criteria-list"),
+  jobCount: document.querySelector("#job-count"),
+  publicCount: document.querySelector("#public-count"),
+  shortlistedCount: document.querySelector("#shortlisted-count"),
+  openImportDialog: document.querySelector("#open-import-dialog"),
+  importDialog: document.querySelector("#import-dialog"),
+  importForm: document.querySelector("#import-form"),
+  closeImportDialog: document.querySelector("#close-import-dialog"),
+  importDateInput: document.querySelector("#import-date-input"),
+  importJsonInput: document.querySelector("#import-json-input"),
+  importStatus: document.querySelector("#import-status"),
+  exactJobList: document.querySelector("#exact-job-list"),
+  overlapJobList: document.querySelector("#overlap-job-list"),
   emptyState: document.querySelector("#empty-state"),
-  taskTemplate: document.querySelector("#task-item-template"),
-  nightlyDialog: document.querySelector("#nightly-dialog"),
-  nightlyForm: document.querySelector("#nightly-form"),
-  nightlyInputs: document.querySelector("#nightly-inputs"),
-  nightlySubtitle: document.querySelector("#nightly-subtitle"),
-  nightlyDateInput: document.querySelector("#nightly-date-input"),
-  openNightlyModal: document.querySelector("#open-nightly-modal"),
-  closeNightlyDialog: document.querySelector("#close-nightly-dialog"),
-  addNightlyTask: document.querySelector("#add-nightly-task"),
-  enableNotifications: document.querySelector("#enable-notifications"),
-  addTaskInline: document.querySelector("#add-task-inline"),
-  quickAddForm: document.querySelector("#quick-add-form"),
-  quickTaskInput: document.querySelector("#quick-task-input"),
+  jobTemplate: document.querySelector("#job-card-template"),
   calendarMonthLabel: document.querySelector("#calendar-month-label"),
   calendarGrid: document.querySelector("#calendar-grid"),
   previousMonth: document.querySelector("#previous-month"),
   nextMonth: document.querySelector("#next-month"),
   jumpToday: document.querySelector("#jump-today"),
+  filterChips: Array.from(document.querySelectorAll(".filter-chip")),
 };
 
 boot();
@@ -43,227 +40,231 @@ async function boot() {
   syncSelectedDate();
   render();
   wireEvents();
-  maybeOpenNightlyPrompt();
 }
 
 function wireEvents() {
-  elements.openNightlyModal.addEventListener("click", () => openNightlyDialog());
-  elements.closeNightlyDialog.addEventListener("click", () => {
-    elements.nightlyDialog.close();
-  });
-  elements.addNightlyTask.addEventListener("click", () => addNightlyInput());
-  elements.nightlyForm.addEventListener("submit", handleNightlySubmit);
-  elements.enableNotifications.addEventListener("click", enableBrowserNotifications);
-  elements.addTaskInline.addEventListener("click", toggleQuickAdd);
-  elements.quickAddForm.addEventListener("submit", handleQuickAdd);
   elements.previousMonth.addEventListener("click", () => changeVisibleMonth(-1));
   elements.nextMonth.addEventListener("click", () => changeVisibleMonth(1));
   elements.jumpToday.addEventListener("click", jumpToToday);
-  document.addEventListener("visibilitychange", async () => {
-    if (!document.hidden) {
-      await refreshState();
-      syncSelectedDate();
+  elements.openImportDialog.addEventListener("click", openImportDialog);
+  elements.closeImportDialog.addEventListener("click", () => elements.importDialog.close());
+  elements.importForm.addEventListener("submit", handleImportSubmit);
+  elements.filterChips.forEach((chip) => {
+    chip.addEventListener("click", () => {
+      state.activeFilter = chip.dataset.filter;
       render();
-      maybeOpenNightlyPrompt();
-    }
+    });
   });
 }
 
 async function refreshState() {
   const response = await fetch("/api/state");
   const payload = await response.json();
-  state.tasksByDate = payload.tasksByDate || {};
-  state.lastNightlyPromptAt = payload.lastNightlyPromptAt || null;
-  state.lastReminderAt = payload.lastReminderAt || null;
-  state.notificationsEnabled = payload.notificationsEnabled || false;
+  state.criteria = payload.criteria || {};
+  state.digestsByDate = payload.digestsByDate || {};
+}
+
+function openImportDialog() {
+  const selectedDigest = getSelectedDigest();
+  elements.importDateInput.value = state.selectedDateKey;
+  elements.importJsonInput.value = JSON.stringify(
+    {
+      date: state.selectedDateKey,
+      summary: selectedDigest?.summary || "Fresh daily digest",
+      criteria: state.criteria,
+      jobs: selectedDigest?.jobs || [],
+    },
+    null,
+    2
+  );
+  elements.importStatus.hidden = true;
+  elements.importDialog.showModal();
+}
+
+async function handleImportSubmit(event) {
+  event.preventDefault();
+  let payload;
+
+  try {
+    payload = JSON.parse(elements.importJsonInput.value);
+  } catch (error) {
+    elements.importStatus.hidden = false;
+    elements.importStatus.textContent = "That JSON is invalid. Double-check the payload and try again.";
+    return;
+  }
+
+  if (elements.importDateInput.value) {
+    payload.date = elements.importDateInput.value;
+  }
+
+  const response = await fetch("/api/import-digest", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    elements.importStatus.hidden = false;
+    elements.importStatus.textContent = "Import failed. Make sure each job has a title, company, and link.";
+    return;
+  }
+
+  await refreshState();
+  state.selectedDateKey = payload.date || getDateKey(new Date());
+  state.visibleMonth = startOfMonth(new Date(`${state.selectedDateKey}T12:00:00`));
+  render();
+  elements.importDialog.close();
 }
 
 function render() {
-  const selectedDateKey = state.selectedDateKey;
-  const selectedTasks = getTasksForDate(selectedDateKey);
-  const completeCount = selectedTasks.filter((task) => task.completed).length;
-  const remainingCount = selectedTasks.length - completeCount;
+  const digest = getSelectedDigest();
+  const allJobs = sortJobs(digest?.jobs || []);
+  const filteredJobs = applyFilter(allJobs);
+  const exactJobs = filteredJobs.filter((job) => job.salaryBandFit === "exact");
+  const overlapJobs = filteredJobs.filter((job) => job.salaryBandFit !== "exact");
+  const publicCount = allJobs.filter((job) => job.companyStatus === "public").length;
+  const shortlistedCount = allJobs.filter((job) => job.shortlisted).length;
 
-  elements.activeDateCaption.textContent = getRelativeDateLabel(selectedDateKey);
-  elements.todayLabel.textContent = formatDateLabel(selectedDateKey);
-  elements.completedCount.textContent = String(completeCount);
-  elements.remainingCount.textContent = String(remainingCount);
-  elements.taskList.innerHTML = "";
-  elements.emptyState.hidden = selectedTasks.length > 0;
-  elements.enableNotifications.textContent = state.notificationsEnabled
-    ? "Browser reminders on"
-    : "Enable browser reminders";
-  elements.quickAddForm.classList.remove("visible");
+  elements.activeDateCaption.textContent = getRelativeDateLabel(state.selectedDateKey);
+  elements.todayLabel.textContent = formatDateLabel(state.selectedDateKey);
+  elements.digestSummary.textContent =
+    digest?.summary || "No digest is available for this date yet.";
+  elements.jobCount.textContent = String(allJobs.length);
+  elements.publicCount.textContent = String(publicCount);
+  elements.shortlistedCount.textContent = String(shortlistedCount);
+  elements.exactJobList.innerHTML = "";
+  elements.overlapJobList.innerHTML = "";
+  elements.emptyState.hidden = filteredJobs.length > 0;
 
-  if (!selectedTasks.length) {
-    elements.emptyState.textContent =
-      selectedDateKey === getDateKey(addDays(new Date(), 1))
-        ? 'Nothing planned for tomorrow yet. Use "Plan tonight" to set it up.'
-        : "Nothing planned for this date yet.";
-  }
-
-  selectedTasks.forEach((task) => {
-    const node = elements.taskTemplate.content.firstElementChild.cloneNode(true);
-    const checkbox = node.querySelector('input[type="checkbox"]');
-    const title = node.querySelector(".task-title");
-    const meta = node.querySelector(".task-meta");
-    const removeButton = node.querySelector(".delete-button");
-
-    checkbox.checked = task.completed;
-    title.textContent = task.title;
-    meta.textContent = task.completed ? "Completed" : "Still open";
-    node.classList.toggle("is-complete", task.completed);
-
-    checkbox.addEventListener("change", async () => {
-      await updateTask(selectedDateKey, task.id, { completed: checkbox.checked });
-      await refreshState();
-      render();
-    });
-
-    removeButton.addEventListener("click", async () => {
-      await removeTask(selectedDateKey, task.id);
-      await refreshState();
-      render();
-    });
-
-    elements.taskList.appendChild(node);
+  renderCriteria();
+  renderFilterState();
+  exactJobs.forEach((job) => {
+    elements.exactJobList.appendChild(createJobCard(job));
   });
-
+  overlapJobs.forEach((job) => {
+    elements.overlapJobList.appendChild(createJobCard(job));
+  });
   renderCalendar();
 }
 
-async function handleNightlySubmit(event) {
-  event.preventDefault();
-  const targetDateKey = elements.nightlyDateInput.value || getDateKey(addDays(new Date(), 1));
-  const titles = Array.from(elements.nightlyInputs.querySelectorAll('input[type="text"]'))
-    .map((input) => input.value.trim())
-    .filter(Boolean);
+function renderCriteria() {
+  const items = [
+    `Location: ${state.criteria.location || "Bay Area"}`,
+    `Salary: ${state.criteria.salary || "$190,000-$220,000"}`,
+    `Focus: ${(state.criteria.industries || []).join(" + ")}`,
+    `Sources: ${(state.criteria.sources || []).join(", ")}`,
+    `Ranking: ${state.criteria.ranking || "Public first"}`,
+  ];
 
-  if (!titles.length) {
-    addNightlyInput();
-    return;
-  }
-
-  await fetch("/api/plan-nightly", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ date: targetDateKey, titles }),
+  elements.criteriaList.innerHTML = "";
+  items.forEach((item) => {
+    const entry = document.createElement("li");
+    entry.textContent = item;
+    elements.criteriaList.appendChild(entry);
   });
-  await refreshState();
-  selectDate(targetDateKey);
-  elements.nightlyDialog.close();
 }
 
-async function handleQuickAdd(event) {
-  event.preventDefault();
-  const title = elements.quickTaskInput.value.trim();
-  if (!title) {
-    return;
-  }
-
-  await addTask(state.selectedDateKey, title);
-  elements.quickTaskInput.value = "";
-  await refreshState();
-  render();
+function renderFilterState() {
+  elements.filterChips.forEach((chip) => {
+    chip.classList.toggle("is-active", chip.dataset.filter === state.activeFilter);
+  });
 }
 
-function toggleQuickAdd() {
-  elements.quickAddForm.classList.toggle("visible");
-  if (elements.quickAddForm.classList.contains("visible")) {
-    elements.quickTaskInput.focus();
-  }
-}
+function createJobCard(job) {
+  const node = elements.jobTemplate.content.firstElementChild.cloneNode(true);
+  const title = node.querySelector(".job-title");
+  const company = node.querySelector(".job-company");
+  const companyStatusBadge = node.querySelector(".company-status-badge");
+  const newBadge = node.querySelector(".new-badge");
+  const sourceBadge = node.querySelector(".source-badge");
+  const bandBadge = node.querySelector(".band-badge");
+  const location = node.querySelector(".job-location");
+  const salary = node.querySelector(".job-salary");
+  const equity = node.querySelector(".job-equity");
+  const companyStatus = node.querySelector(".job-company-status");
+  const companySize = node.querySelector(".job-company-size");
+  const benefitList = node.querySelector(".benefit-list");
+  const recruiterValue = node.querySelector(".recruiter-value");
+  const fitNote = node.querySelector(".fit-note");
+  const applyLink = node.querySelector(".apply-link");
+  const saveButton = node.querySelector(".save-button");
 
-function openNightlyDialog() {
-  const defaultDateKey = state.selectedDateKey || getDateKey(addDays(new Date(), 1));
-  elements.nightlySubtitle.textContent = `Add the most important things you want to finish for ${formatDateLabel(defaultDateKey)}.`;
-  elements.nightlyDateInput.value = defaultDateKey;
-  elements.nightlyInputs.innerHTML = "";
-  addNightlyInput();
-  addNightlyInput();
-  addNightlyInput();
-  elements.nightlyDialog.showModal();
-}
+  title.textContent = job.title;
+  company.textContent = job.company;
+  companyStatusBadge.textContent = job.companyStatus === "public" ? "Public" : "Private";
+  newBadge.hidden = !job.isNewToday;
+  sourceBadge.textContent = job.source;
+  bandBadge.textContent = job.salaryBandFit === "exact" ? "Exact band fit" : "Overlap fit";
+  location.textContent = job.location;
+  salary.textContent = job.salary;
+  equity.textContent = job.equityStatus;
+  companyStatus.textContent = job.companySharesNote;
+  companySize.textContent = job.companySizeHint || "Not specified";
+  fitNote.textContent = job.fitNote;
+  applyLink.href = job.link;
+  saveButton.textContent = job.shortlisted ? "Shortlisted" : "Save";
+  saveButton.classList.toggle("is-saved", job.shortlisted);
 
-function addNightlyInput(value = "") {
-  const input = document.createElement("input");
-  input.type = "text";
-  input.maxLength = 120;
-  input.placeholder = "Finish quarterly report";
-  input.value = value;
-  elements.nightlyInputs.appendChild(input);
-  input.focus();
-}
+  benefitList.innerHTML = "";
+  job.benefits.forEach((benefit) => {
+    const item = document.createElement("li");
+    item.textContent = benefit;
+    benefitList.appendChild(item);
+  });
 
-function maybeOpenNightlyPrompt() {
-  const now = new Date();
-  const todayKey = getDateKey(now);
-  const tomorrowKey = getDateKey(addDays(now, 1));
-  const promptedToday = state.lastNightlyPromptAt
-    ? getDateKey(new Date(state.lastNightlyPromptAt)) === todayKey
-    : false;
-  const alreadyPlannedTomorrow = getTasksForDate(tomorrowKey).length > 0;
+  recruiterValue.textContent =
+    formatRecruiter(job.recruiterName, job.recruiterContact) || "Not listed";
 
-  if (now.getHours() >= NIGHTLY_PROMPT_HOUR && !promptedToday && !alreadyPlannedTomorrow) {
-    state.selectedDateKey = tomorrowKey;
-    openNightlyDialog();
-  }
-}
-
-function selectDate(dateKey) {
-  state.selectedDateKey = dateKey;
-  state.visibleMonth = startOfMonth(new Date(`${dateKey}T12:00:00`));
-  render();
-}
-
-function syncSelectedDate() {
-  if (!state.selectedDateKey) {
-    state.selectedDateKey = getDateKey(new Date());
-  }
-  state.visibleMonth = startOfMonth(new Date(`${state.selectedDateKey}T12:00:00`));
-}
-
-async function enableBrowserNotifications() {
-  if (!("Notification" in window)) {
-    window.alert("This browser does not support notifications.");
-    return;
-  }
-
-  const result = await Notification.requestPermission();
-  if (result === "granted") {
-    await fetch("/api/preferences", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ notificationsEnabled: true }),
-    });
+  saveButton.addEventListener("click", async () => {
+    await updateJob(state.selectedDateKey, job.id, { shortlisted: !job.shortlisted });
     await refreshState();
     render();
+  });
+
+  return node;
+}
+
+function formatRecruiter(name, contact) {
+  if (name && contact) {
+    return `${name} • ${contact}`;
   }
+  return name || contact || "";
 }
 
-function getTasksForDate(dateKey) {
-  return state.tasksByDate[dateKey] || [];
+function getSelectedDigest() {
+  return state.digestsByDate[state.selectedDateKey] || null;
 }
 
-async function addTask(dateKey, title) {
-  await fetch(`/api/tasks/${encodeURIComponent(dateKey)}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title }),
+function sortJobs(jobs) {
+  return [...jobs].sort((left, right) => {
+    if (left.companyStatus !== right.companyStatus) {
+      return left.companyStatus === "public" ? -1 : 1;
+    }
+    if (left.shortlisted !== right.shortlisted) {
+      return left.shortlisted ? -1 : 1;
+    }
+    return left.company.localeCompare(right.company);
   });
 }
 
-async function updateTask(dateKey, taskId, updates) {
-  await fetch(`/api/tasks/${encodeURIComponent(dateKey)}/${encodeURIComponent(taskId)}`, {
+function applyFilter(jobs) {
+  switch (state.activeFilter) {
+    case "public":
+      return jobs.filter((job) => job.companyStatus === "public");
+    case "private":
+      return jobs.filter((job) => job.companyStatus === "private");
+    case "shortlisted":
+      return jobs.filter((job) => job.shortlisted);
+    default:
+      return jobs;
+  }
+}
+
+async function updateJob(dateKey, jobId, updates) {
+  await fetch(`/api/jobs/${encodeURIComponent(dateKey)}/${encodeURIComponent(jobId)}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(updates),
-  });
-}
-
-async function removeTask(dateKey, taskId) {
-  await fetch(`/api/tasks/${encodeURIComponent(dateKey)}/${encodeURIComponent(taskId)}`, {
-    method: "DELETE",
   });
 }
 
@@ -281,8 +282,9 @@ function renderCalendar() {
   for (let index = 0; index < 42; index += 1) {
     const currentDate = addDays(gridStart, index);
     const dateKey = getDateKey(currentDate);
-    const tasks = getTasksForDate(dateKey);
-    const completedCount = tasks.filter((task) => task.completed).length;
+    const digest = state.digestsByDate[dateKey];
+    const jobCount = digest?.jobs?.length || 0;
+    const publicCount = digest?.jobs?.filter((job) => job.companyStatus === "public").length || 0;
     const button = document.createElement("button");
 
     button.type = "button";
@@ -292,7 +294,7 @@ function renderCalendar() {
     button.classList.toggle("is-today", dateKey === todayKey);
     button.innerHTML = `
       <span class="calendar-day-number">${currentDate.getDate()}</span>
-      <span class="calendar-day-meta">${tasks.length ? `${completedCount}/${tasks.length} done` : "No tasks"}</span>
+      <span class="calendar-day-meta">${jobCount ? `${publicCount} public / ${jobCount} total` : "No digest"}</span>
     `;
     button.addEventListener("click", () => {
       state.selectedDateKey = dateKey;
@@ -312,7 +314,17 @@ function changeVisibleMonth(offset) {
 }
 
 function jumpToToday() {
-  selectDate(getDateKey(new Date()));
+  state.selectedDateKey = getDateKey(new Date());
+  state.visibleMonth = startOfMonth(new Date());
+  render();
+}
+
+function syncSelectedDate() {
+  if (!state.digestsByDate[state.selectedDateKey]) {
+    const availableDates = Object.keys(state.digestsByDate).sort();
+    state.selectedDateKey = availableDates.at(-1) || getDateKey(new Date());
+  }
+  state.visibleMonth = startOfMonth(new Date(`${state.selectedDateKey}T12:00:00`));
 }
 
 function getDateKey(date) {
@@ -329,19 +341,19 @@ function formatDateLabel(dateKey) {
 
 function getRelativeDateLabel(dateKey) {
   const todayKey = getDateKey(new Date());
-  const tomorrowKey = getDateKey(addDays(new Date(), 1));
   const yesterdayKey = getDateKey(addDays(new Date(), -1));
+  const tomorrowKey = getDateKey(addDays(new Date(), 1));
 
   if (dateKey === todayKey) {
     return "Today";
   }
-  if (dateKey === tomorrowKey) {
-    return "Tomorrow";
-  }
   if (dateKey === yesterdayKey) {
     return "Yesterday";
   }
-  return "Selected day";
+  if (dateKey === tomorrowKey) {
+    return "Tomorrow";
+  }
+  return "Selected digest";
 }
 
 function addDays(date, days) {
