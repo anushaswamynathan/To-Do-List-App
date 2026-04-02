@@ -1,9 +1,9 @@
 {
-  "name": "Bay PM Jobs",
-  "short_name": "BayJobs",
+  "name": "Nightly To-Dos",
+  "short_name": "Nightly",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#f3efe6",
-  "theme_color": "#0b7285",
+  "background_color": "#f7f2e8",
+  "theme_color": "#b6461d",
   "icons": []
 }
