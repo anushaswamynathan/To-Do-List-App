@@ -1,4 +1,9 @@
 const NIGHTLY_PROMPT_HOUR = 21;
+const TASK_PLACEHOLDERS = [
+  "Treat yourself to an ice-cream",
+  "Go for a walk",
+  "Hum your fav song",
+];
 
 const state = {
   tasksByDate: {},
@@ -264,7 +269,7 @@ function addNightlyInput(value = "") {
   const input = document.createElement("input");
   input.type = "text";
   input.maxLength = 120;
-  input.placeholder = "Treat yourself to an ice-cream";
+  input.placeholder = TASK_PLACEHOLDERS[elements.nightlyInputs.children.length % TASK_PLACEHOLDERS.length];
   input.value = value;
   elements.nightlyInputs.appendChild(input);
   input.focus();
