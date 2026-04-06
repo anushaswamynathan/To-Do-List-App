@@ -7,6 +7,7 @@ const state = {
   notificationsEnabled: false,
   selectedDateKey: getDateKey(new Date()),
   visibleMonth: startOfMonth(new Date()),
+  activeView: "daily",
 };
 
 const elements = {
@@ -15,8 +16,10 @@ const elements = {
   completedCount: document.querySelector("#completed-count"),
   remainingCount: document.querySelector("#remaining-count"),
   taskList: document.querySelector("#task-list"),
+  weeklyList: document.querySelector("#weekly-list"),
   emptyState: document.querySelector("#empty-state"),
   taskTemplate: document.querySelector("#task-item-template"),
+  weeklyDayTemplate: document.querySelector("#weekly-day-template"),
   nightlyDialog: document.querySelector("#nightly-dialog"),
   nightlyForm: document.querySelector("#nightly-form"),
   nightlyInputs: document.querySelector("#nightly-inputs"),
@@ -34,6 +37,8 @@ const elements = {
   previousMonth: document.querySelector("#previous-month"),
   nextMonth: document.querySelector("#next-month"),
   jumpToday: document.querySelector("#jump-today"),
+  showDaily: document.querySelector("#show-daily"),
+  showWeekly: document.querySelector("#show-weekly"),
 };
 
 boot();
@@ -47,7 +52,7 @@ async function boot() {
 }
 
 function wireEvents() {
-  elements.openNightlyModal.addEventListener("click", () => openNightlyDialog());
+  elements.openNightlyModal.addEventListener("click", () => openTaskDialog());
   elements.closeNightlyDialog.addEventListener("click", () => {
     elements.nightlyDialog.close();
   });
@@ -59,6 +64,8 @@ function wireEvents() {
   elements.previousMonth.addEventListener("click", () => changeVisibleMonth(-1));
   elements.nextMonth.addEventListener("click", () => changeVisibleMonth(1));
   elements.jumpToday.addEventListener("click", jumpToToday);
+  elements.showDaily.addEventListener("click", () => setActiveView("daily"));
+  elements.showWeekly.addEventListener("click", () => setActiveView("weekly"));
   document.addEventListener("visibilitychange", async () => {
     if (!document.hidden) {
       await refreshState();
@@ -79,62 +86,128 @@ async function refreshState() {
 }
 
 function render() {
-  const selectedDateKey = state.selectedDateKey;
-  const selectedTasks = getTasksForDate(selectedDateKey);
-  const completeCount = selectedTasks.filter((task) => task.completed).length;
-  const remainingCount = selectedTasks.length - completeCount;
+  renderHeader();
+  renderTaskArea();
+  renderCalendar();
+}
 
-  elements.activeDateCaption.textContent = getRelativeDateLabel(selectedDateKey);
-  elements.todayLabel.textContent = formatDateLabel(selectedDateKey);
+function renderHeader() {
+  const selectedDateKey = state.selectedDateKey;
+  const dailyTasks = getTasksForDate(selectedDateKey);
+  const weekDates = getWeekDates(selectedDateKey);
+  const weekTasks = weekDates.flatMap((dateKey) => getTasksForDate(dateKey));
+  const tasks = state.activeView === "weekly" ? weekTasks : dailyTasks;
+  const completeCount = tasks.filter((task) => task.completed).length;
+  const remainingCount = tasks.length - completeCount;
+
+  elements.activeDateCaption.textContent =
+    state.activeView === "weekly" ? "Selected week" : getRelativeDateLabel(selectedDateKey);
+  elements.todayLabel.textContent =
+    state.activeView === "weekly"
+      ? formatWeekLabel(selectedDateKey)
+      : formatDateLabel(selectedDateKey);
   elements.completedCount.textContent = String(completeCount);
   elements.remainingCount.textContent = String(remainingCount);
-  elements.taskList.innerHTML = "";
-  elements.emptyState.hidden = selectedTasks.length > 0;
   elements.enableNotifications.textContent = state.notificationsEnabled
     ? "Browser reminders on"
-    : "Enable browser reminders";
-  elements.quickAddForm.classList.remove("visible");
+    : "Enable reminders";
+  elements.showDaily.classList.toggle("is-active", state.activeView === "daily");
+  elements.showWeekly.classList.toggle("is-active", state.activeView === "weekly");
+}
 
+function renderTaskArea() {
+  elements.taskList.innerHTML = "";
+  elements.weeklyList.innerHTML = "";
+  elements.quickAddForm.classList.remove("visible");
+  elements.taskList.hidden = state.activeView !== "daily";
+  elements.weeklyList.hidden = state.activeView !== "weekly";
+
+  if (state.activeView === "daily") {
+    renderDailyTasks();
+    return;
+  }
+
+  renderWeeklyTasks();
+}
+
+function renderDailyTasks() {
+  const selectedTasks = getTasksForDate(state.selectedDateKey);
+  elements.emptyState.hidden = selectedTasks.length > 0;
   if (!selectedTasks.length) {
-    elements.emptyState.textContent =
-      selectedDateKey === getDateKey(addDays(new Date(), 1))
-        ? 'Nothing planned for tomorrow yet. Use "Plan tonight" to set it up.'
-        : "Nothing planned for this date yet.";
+    elements.emptyState.textContent = "Nothing planned for this day yet.";
   }
 
   selectedTasks.forEach((task) => {
-    const node = elements.taskTemplate.content.firstElementChild.cloneNode(true);
-    const checkbox = node.querySelector('input[type="checkbox"]');
-    const title = node.querySelector(".task-title");
-    const meta = node.querySelector(".task-meta");
-    const removeButton = node.querySelector(".delete-button");
+    elements.taskList.appendChild(createTaskNode(task, state.selectedDateKey));
+  });
+}
 
-    checkbox.checked = task.completed;
-    title.textContent = task.title;
-    meta.textContent = task.completed ? "Completed" : "Still open";
-    node.classList.toggle("is-complete", task.completed);
+function renderWeeklyTasks() {
+  const weekDates = getWeekDates(state.selectedDateKey);
+  const totalTasks = weekDates.reduce((count, dateKey) => count + getTasksForDate(dateKey).length, 0);
+  elements.emptyState.hidden = totalTasks > 0;
+  if (!totalTasks) {
+    elements.emptyState.textContent = "Nothing planned for this week yet.";
+  }
 
-    checkbox.addEventListener("change", async () => {
-      await updateTask(selectedDateKey, task.id, { completed: checkbox.checked });
-      await refreshState();
+  weekDates.forEach((dateKey) => {
+    const tasks = getTasksForDate(dateKey);
+    const section = elements.weeklyDayTemplate.content.firstElementChild.cloneNode(true);
+    const label = section.querySelector(".weekly-day-label");
+    const title = section.querySelector(".weekly-day-title");
+    const list = section.querySelector(".weekly-day-tasks");
+    const empty = section.querySelector(".weekly-day-empty");
+    const jump = section.querySelector(".weekly-day-jump");
+
+    label.textContent = getRelativeDateLabel(dateKey);
+    title.textContent = formatDateLabel(dateKey);
+    empty.hidden = tasks.length > 0;
+
+    tasks.forEach((task) => {
+      list.appendChild(createTaskNode(task, dateKey));
+    });
+
+    jump.addEventListener("click", () => {
+      state.selectedDateKey = dateKey;
+      state.activeView = "daily";
       render();
     });
 
-    removeButton.addEventListener("click", async () => {
-      await removeTask(selectedDateKey, task.id);
-      await refreshState();
-      render();
-    });
+    elements.weeklyList.appendChild(section);
+  });
+}
 
-    elements.taskList.appendChild(node);
+function createTaskNode(task, dateKey) {
+  const node = elements.taskTemplate.content.firstElementChild.cloneNode(true);
+  const checkbox = node.querySelector('input[type="checkbox"]');
+  const title = node.querySelector(".task-title");
+  const meta = node.querySelector(".task-meta");
+  const removeButton = node.querySelector(".delete-button");
+
+  checkbox.checked = task.completed;
+  title.textContent = task.title;
+  meta.textContent =
+    state.activeView === "weekly" ? formatDateLabel(dateKey) : task.completed ? "Completed" : "Still open";
+  node.classList.toggle("is-complete", task.completed);
+
+  checkbox.addEventListener("change", async () => {
+    await updateTask(dateKey, task.id, { completed: checkbox.checked });
+    await refreshState();
+    render();
   });
 
-  renderCalendar();
+  removeButton.addEventListener("click", async () => {
+    await removeTask(dateKey, task.id);
+    await refreshState();
+    render();
+  });
+
+  return node;
 }
 
 async function handleNightlySubmit(event) {
   event.preventDefault();
-  const targetDateKey = elements.nightlyDateInput.value || getDateKey(addDays(new Date(), 1));
+  const targetDateKey = elements.nightlyDateInput.value || state.selectedDateKey;
   const titles = Array.from(elements.nightlyInputs.querySelectorAll('input[type="text"]'))
     .map((input) => input.value.trim())
     .filter(Boolean);
@@ -150,6 +223,7 @@ async function handleNightlySubmit(event) {
     body: JSON.stringify({ date: targetDateKey, titles }),
   });
   await refreshState();
+  state.activeView = "daily";
   selectDate(targetDateKey);
   elements.nightlyDialog.close();
 }
@@ -168,15 +242,16 @@ async function handleQuickAdd(event) {
 }
 
 function toggleQuickAdd() {
+  state.activeView = "daily";
   elements.quickAddForm.classList.toggle("visible");
   if (elements.quickAddForm.classList.contains("visible")) {
     elements.quickTaskInput.focus();
   }
 }
 
-function openNightlyDialog() {
-  const defaultDateKey = state.selectedDateKey || getDateKey(addDays(new Date(), 1));
-  elements.nightlySubtitle.textContent = `Add the most important things you want to finish for ${formatDateLabel(defaultDateKey)}.`;
+function openTaskDialog() {
+  const defaultDateKey = state.selectedDateKey || getDateKey(new Date());
+  elements.nightlySubtitle.textContent = `Add the tasks you want to keep track of for ${formatDateLabel(defaultDateKey)}.`;
   elements.nightlyDateInput.value = defaultDateKey;
   elements.nightlyInputs.innerHTML = "";
   addNightlyInput();
@@ -206,8 +281,13 @@ function maybeOpenNightlyPrompt() {
 
   if (now.getHours() >= NIGHTLY_PROMPT_HOUR && !promptedToday && !alreadyPlannedTomorrow) {
     state.selectedDateKey = tomorrowKey;
-    openNightlyDialog();
+    openTaskDialog();
   }
+}
+
+function setActiveView(view) {
+  state.activeView = view;
+  render();
 }
 
 function selectDate(dateKey) {
@@ -243,6 +323,12 @@ async function enableBrowserNotifications() {
 
 function getTasksForDate(dateKey) {
   return state.tasksByDate[dateKey] || [];
+}
+
+function getWeekDates(anchorDateKey) {
+  const anchor = new Date(`${anchorDateKey}T12:00:00`);
+  const weekStart = addDays(anchor, -anchor.getDay());
+  return Array.from({ length: 7 }, (_, index) => getDateKey(addDays(weekStart, index)));
 }
 
 async function addTask(dateKey, title) {
@@ -325,6 +411,15 @@ function formatDateLabel(dateKey) {
     month: "long",
     day: "numeric",
   });
+}
+
+function formatWeekLabel(anchorDateKey) {
+  const weekDates = getWeekDates(anchorDateKey);
+  const start = new Date(`${weekDates[0]}T12:00:00`);
+  const end = new Date(`${weekDates[6]}T12:00:00`);
+  const startLabel = start.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  const endLabel = end.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return `${startLabel} - ${endLabel}`;
 }
 
 function getRelativeDateLabel(dateKey) {

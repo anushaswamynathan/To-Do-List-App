@@ -3,10 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Nightly To-Dos</title>
+    <title>Daily To-Dos</title>
     <meta
       name="description"
-      content="Plan tomorrow's tasks each night and stay on top of unfinished work."
+      content="Track tasks across the day or week and stay on top of unfinished work."
     />
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="stylesheet" href="styles.css" />
@@ -14,14 +14,14 @@
   <body>
     <main class="app-shell">
       <section class="hero">
-        <p class="eyebrow">Nightly planner</p>
-        <h1>Capture tomorrow before the day gets away from you.</h1>
+        <p class="eyebrow">Daily planner</p>
+        <h1>Keep the day moving without losing the bigger picture.</h1>
         <p class="hero-copy">
-          Add your tasks each night, check them off during the day, and get nudges
-          for anything still open.
+          Add tasks whenever you need them, check them off as you go, and switch
+          between a focused daily view and a week-at-a-glance plan.
         </p>
         <div class="hero-actions">
-          <button id="open-nightly-modal" class="primary-button">Plan tonight</button>
+          <button id="open-nightly-modal" class="primary-button">Add tasks</button>
           <button id="enable-notifications" class="secondary-button">
             Enable reminders
           </button>
@@ -48,6 +48,38 @@
       <section class="panel">
         <div class="panel-head">
           <div>
+            <p class="panel-label">Task list</p>
+            <h2>Your tasks</h2>
+          </div>
+          <div class="panel-actions">
+            <div class="view-toggle" role="tablist" aria-label="Task view">
+              <button id="show-daily" class="view-chip is-active" type="button">Daily</button>
+              <button id="show-weekly" class="view-chip" type="button">Weekly</button>
+            </div>
+            <button id="add-task-inline" class="text-button">Add task</button>
+          </div>
+        </div>
+        <form id="quick-add-form" class="quick-add-form">
+          <label for="quick-task-input" class="sr-only">Task</label>
+          <input
+            id="quick-task-input"
+            name="task"
+            type="text"
+            maxlength="120"
+            placeholder="Add a task for the selected date"
+          />
+          <button class="primary-button" type="submit">Save</button>
+        </form>
+        <ul id="task-list" class="task-list"></ul>
+        <div id="weekly-list" class="weekly-list" hidden></div>
+        <p id="empty-state" class="empty-state">
+          Nothing planned yet. Use "Add tasks" to get started.
+        </p>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
             <p class="panel-label">Calendar</p>
             <h2 id="calendar-month-label"></h2>
           </div>
@@ -68,39 +100,12 @@
         </div>
         <div id="calendar-grid" class="calendar-grid"></div>
       </section>
-
-      <section class="panel">
-        <div class="panel-head">
-          <div>
-            <p class="panel-label">Task list</p>
-            <h2>Your plan</h2>
-          </div>
-          <div class="panel-actions">
-            <button id="add-task-inline" class="text-button">Add task</button>
-          </div>
-        </div>
-        <form id="quick-add-form" class="quick-add-form">
-          <label for="quick-task-input" class="sr-only">Task</label>
-          <input
-            id="quick-task-input"
-            name="task"
-            type="text"
-            maxlength="120"
-            placeholder="Add a task for the selected date"
-          />
-          <button class="primary-button" type="submit">Save</button>
-        </form>
-        <ul id="task-list" class="task-list"></ul>
-        <p id="empty-state" class="empty-state">
-          Nothing planned yet. Use "Plan tonight" to set up tomorrow.
-        </p>
-      </section>
     </main>
 
     <dialog id="nightly-dialog" class="nightly-dialog">
       <form method="dialog" class="nightly-card" id="nightly-form">
         <div class="nightly-head">
-          <p class="panel-label">9:00 PM ritual</p>
+          <p class="panel-label">Quick capture</p>
           <h2>What do you need to get done?</h2>
           <p id="nightly-subtitle" class="nightly-copy"></p>
         </div>
@@ -116,9 +121,9 @@
           <button type="button" id="add-nightly-task" class="text-button">Add another</button>
           <div class="nightly-submit">
             <button type="button" id="close-nightly-dialog" class="secondary-button">
-              Later
+              Close
             </button>
-            <button type="submit" class="primary-button">Save plan</button>
+            <button type="submit" class="primary-button">Save tasks</button>
           </div>
         </div>
       </form>
@@ -138,6 +143,20 @@
           Remove
         </button>
       </li>
+    </template>
+
+    <template id="weekly-day-template">
+      <section class="weekly-day">
+        <div class="weekly-day-head">
+          <div>
+            <p class="weekly-day-label"></p>
+            <h3 class="weekly-day-title"></h3>
+          </div>
+          <button class="weekly-day-jump text-button" type="button">Open day</button>
+        </div>
+        <ul class="weekly-day-tasks"></ul>
+        <p class="weekly-day-empty">No tasks for this day.</p>
+      </section>
     </template>
 
     <script src="app.js"></script>
