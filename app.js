@@ -264,7 +264,7 @@ function addNightlyInput(value = "") {
   const input = document.createElement("input");
   input.type = "text";
   input.maxLength = 120;
-  input.placeholder = "Finish quarterly report";
+  input.placeholder = "Treat yourself to an ice-cream";
   input.value = value;
   elements.nightlyInputs.appendChild(input);
   input.focus();
